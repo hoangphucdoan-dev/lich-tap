@@ -1,0 +1,42 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+defaults:
+  run:
+    working-directory: lich-tap
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install
+      - run: npx cap add android
+      - name: Thêm quyền thông báo
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n</manifest>#' $M
+      - run: npx cap sync android
+      - name: Build APK
+        working-directory: lich-tap/android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lich-tap-apk
+          path: lich-tap/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Tạo bản phát hành để tải APK trực tiếp
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Lịch tập – bản ${{ github.run_number }}
+          files: lich-tap/android/app/build/outputs/apk/debug/app-debug.apk
